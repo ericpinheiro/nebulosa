@@ -4,13 +4,30 @@ import { StyleSheet, View, type LayoutChangeEvent, type ViewStyle } from 'react-
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type * as THREE from 'three';
 
+import { tuning } from '@/config/tuning';
 import { useGalaxyStore } from '@/galaxy/store';
+import { usePlayerStore } from '@/state/player';
 
 import { CameraRig } from './CameraRig';
+import { CurrentHighlight } from './CurrentHighlight';
 import { SESSION_EPOCH } from './epoch';
 import { FrameDriver } from './FrameDriver';
 import { GalaxyPoints, type PointsDynamics } from './GalaxyPoints';
-import { beginInteraction, createOrbit, drag, endInteraction, isCloseZoom, pan, pinch, type Orbit } from './orbit';
+import {
+  beginInteraction,
+  CAMERA_FOV,
+  configureFit,
+  createOrbit,
+  drag,
+  endInteraction,
+  fitFactor,
+  focusOn,
+  isCloseZoom,
+  pan,
+  pinch,
+  type Orbit,
+  type ViewInsets,
+} from './orbit';
 
 export interface GalaxyViewProps {
   style?: ViewStyle;
@@ -23,13 +40,17 @@ export interface GalaxyViewProps {
   getBeat?: () => number;
   /** Chamado a cada quadro com a câmera (capas no zoom). */
   onFrame?: (camera: THREE.PerspectiveCamera, size: { width: number; height: number }, orbit: Orbit) => void;
-  /** Toque simples em área vazia (ex.: reexibir a interface). */
-  onTap?: () => void;
+  /** Toque simples na galáxia, em coordenadas locais (capas são achadas pela posição). */
+  onTap?: (x: number, y: number) => void;
   /** Avisado quando o usuário começa/termina de mexer na galáxia. */
   onInteraction?: (active: boolean) => void;
-  /** Elementos sobrepostos que recebem toque (capas). */
+  /** Altura (px) coberta pela interface em cima e embaixo: a galáxia é enquadrada no espaço entre elas. */
+  viewInsets?: ViewInsets;
+  /** Elementos sobrepostos (capas). */
   children?: React.ReactNode;
 }
+
+const NO_INSETS: ViewInsets = { top: 0, bottom: 0 };
 
 export function GalaxyView({
   style,
@@ -40,14 +61,17 @@ export function GalaxyView({
   onFrame,
   onTap,
   onInteraction,
+  viewInsets = NO_INSETS,
   children,
 }: GalaxyViewProps) {
   const data = useGalaxyStore((s) => s.data);
   const load = useGalaxyStore((s) => s.load);
+  const bounds = useGalaxyStore((s) => s.bounds);
   const orbit = useRef<Orbit>(createOrbit()).current;
   const activeRef = useRef(false);
-  const dynamics = useRef<PointsDynamics>({ currentIndex: -1, beat: 0, pulseEnabled: 1 });
-  const [height, setHeight] = useState(1);
+  const dynamics = useRef<PointsDynamics>({ currentIndex: -1, beat: 0, pulseEnabled: 1, playing: 0 });
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const height = Math.max(size.height, 1);
 
   useEffect(() => {
     void load();
@@ -56,6 +80,31 @@ export function GalaxyView({
   const currentIndex = currentId && data ? (data.indexById.get(currentId) ?? -1) : -1;
   dynamics.current.currentIndex = currentIndex;
 
+  // Enquadramento: galáxia inteira na área livre entre cabeçalho e controles.
+  useEffect(() => {
+    if (!bounds || size.width <= 0 || size.height <= 0) return;
+    const R = tuning.galaxy.worldRadius;
+    const center: [number, number, number] = [bounds.center[0] * R, bounds.center[1] * R, bounds.center[2] * R];
+    const k = fitFactor(size, viewInsets, CAMERA_FOV);
+    configureFit(orbit, center, bounds.radius * R, k, (viewInsets.top - viewInsets.bottom) / 2);
+  }, [bounds, size, viewInsets, orbit]);
+
+  // Centro da órbita na música tocando (troca escolhida ou automática).
+  useEffect(() => {
+    if (!data || currentIndex < 0) return;
+    const R = tuning.galaxy.worldRadius;
+    const p = data.positions;
+    focusOn(orbit, [p[currentIndex * 3] * R, p[currentIndex * 3 + 1] * R, p[currentIndex * 3 + 2] * R]);
+  }, [data, currentIndex, orbit]);
+
+  // Diagnóstico do destaque: a música tocando foi achada na galáxia?
+  const source = useGalaxyStore((s) => s.source);
+  useEffect(() => {
+    if (__DEV__ && currentId) {
+      console.log(`[galaxy] atual=${currentId} índice=${currentIndex} fonte=${source} pontos=${data?.ids.length ?? 0}`);
+    }
+  }, [currentId, currentIndex, source, data]);
+
   const isActive = useCallback(() => activeRef.current || orbit.interacting, [orbit]);
 
   const handleFrame = useCallback(
@@ -63,6 +112,7 @@ export function GalaxyView({
       const close = isCloseZoom(orbit);
       dynamics.current.pulseEnabled = close ? 0 : 1;
       dynamics.current.beat = getBeat ? getBeat() : 0;
+      dynamics.current.playing = usePlayerStore.getState().status === 'playing' ? 1 : 0;
       onFrame?.(camera, size, orbit);
     },
     [getBeat, onFrame, orbit],
@@ -135,26 +185,30 @@ export function GalaxyView({
     const tap = Gesture.Tap()
       .runOnJS(true)
       .maxDuration(250)
-      .onEnd((_e, success) => {
-        if (success) onTap?.();
+      .onEnd((e, success) => {
+        if (success) onTap?.(e.x, e.y);
       });
 
     return Gesture.Race(Gesture.Simultaneous(zoom, move), rotate, tap);
   }, [orbit, height, onInteraction, onTap]);
 
-  const onLayout = (e: LayoutChangeEvent) => setHeight(e.nativeEvent.layout.height);
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width, height: h } = e.nativeEvent.layout;
+    setSize((s) => (s.width === width && s.height === h ? s : { width, height: h }));
+  };
 
   return (
     <View style={[styles.fill, style]} onLayout={onLayout}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Canvas
           frameloop="demand"
-          camera={{ fov: 50, position: [0, 0, orbit.distance] }}
+          camera={{ fov: CAMERA_FOV, position: [0, 0, orbit.distance] }}
           onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
           style={styles.fill}
         >
           <CameraRig orbit={orbit} activeRef={activeRef} onFrame={handleFrame} />
           {data ? <GalaxyPoints data={data} played={played} epoch={epoch} dynamics={dynamics} /> : null}
+          {data ? <CurrentHighlight data={data} dynamics={dynamics} /> : null}
           <FrameDriver isActive={isActive} />
         </Canvas>
       </View>

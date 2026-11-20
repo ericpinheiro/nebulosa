@@ -1,6 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import type BottomSheet from '@gorhom/bottom-sheet';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,10 +13,10 @@ import { useCoverColor } from '@/ui/hooks/useCoverColor';
 import { LibrarySheet } from '@/ui/library/LibrarySheet';
 
 import { Background } from './Background';
-import { Controls } from './Controls';
 import { ExpandedAlbum } from './ExpandedAlbum';
 import { Header } from './Header';
-import { ProgressBar } from './ProgressBar';
+import { LibraryLineIcon, ShuffleLineIcon } from './LineIcons';
+import { OrbControl } from './OrbControl';
 import { RadioButton } from './RadioButton';
 
 export interface NowPlayingExtras {
@@ -37,12 +36,21 @@ export function NowPlayingScreen({
   renderFavoriteTrailing,
 }: NowPlayingExtras) {
   const current = usePlayerStore((s) => s.current);
+  const shuffle = usePlayerStore((s) => s.shuffle);
+  const toggleShuffle = usePlayerStore((s) => s.toggleShuffle);
   const sheetRef = useRef<BottomSheet>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [interacting, setInteracting] = useState(false);
+  const [orbActive, setOrbActive] = useState(false);
+  const [screenH, setScreenH] = useState(0);
+  const [free, setFree] = useState<{ y: number; height: number } | null>(null);
+  const viewInsets = useMemo(
+    () => (free && screenH > 0 ? { top: free.y, bottom: Math.max(0, screenH - free.y - free.height) } : undefined),
+    [free, screenH],
+  );
   const coverColor = useCoverColor(current?.imageItemId, current?.imageTag);
-  const { visible, poke } = useAutoHide(sheetOpen || expanded || interacting);
+  const { visible, poke } = useAutoHide(sheetOpen || expanded || interacting || orbActive);
 
   const [top] = backgroundGradient(coverColor, tuning.ui.backgroundWhiteMix);
   const fg = luminance(top) > 0.62 ? '#1d1d22' : '#ffffff';
@@ -70,16 +78,17 @@ export function NowPlayingScreen({
   };
 
   return (
-    <View style={styles.fill} onTouchStart={poke}>
+    <View style={styles.fill} onTouchStart={poke} onLayout={(e) => setScreenH(e.nativeEvent.layout.height)}>
       <Background color={coverColor} />
 
       <Animated.View style={[StyleSheet.absoluteFill, galaxyStyle]} pointerEvents={expanded ? 'none' : 'auto'}>
         <GalaxyView
           currentId={current?.id ?? null}
           {...galaxy}
-          onTap={() => {
+          viewInsets={viewInsets}
+          onTap={(x, y) => {
             poke();
-            galaxy?.onTap?.();
+            galaxy?.onTap?.(x, y);
           }}
           onInteraction={setInteracting}
         />
@@ -98,25 +107,44 @@ export function NowPlayingScreen({
           ) : null}
         </Animated.View>
 
-        <View style={styles.center} pointerEvents="box-none">
+        <View
+          style={styles.center}
+          pointerEvents="box-none"
+          onLayout={(e) => {
+            const { y, height } = e.nativeEvent.layout;
+            setFree((f) => (f && f.y === y && f.height === height ? f : { y, height }));
+          }}
+        >
           {expanded && current ? <ExpandedAlbum track={current} color={fg} onClose={() => setExpanded(false)} /> : null}
         </View>
 
         <Animated.View style={[styles.bottom, uiStyle]} pointerEvents={visible ? 'box-none' : 'none'}>
-          {current ? (
-            <>
-              <ProgressBar color={fg} />
-              <Controls color={fg} />
-            </>
-          ) : null}
-          <Pressable
-            onPress={openLibrary}
-            style={({ pressed }) => [styles.libraryButton, { borderColor: fg, opacity: pressed ? 0.6 : 1 }]}
-            accessibilityRole="button"
-            accessibilityLabel="Abrir biblioteca"
-          >
-            <Ionicons name="library-outline" size={22} color={fg} />
-          </Pressable>
+          <View style={styles.side}>
+            <Pressable
+              onPress={openLibrary}
+              hitSlop={10}
+              style={({ pressed }) => [styles.iconButton, { opacity: pressed ? 0.5 : 1 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir biblioteca"
+            >
+              <LibraryLineIcon color={fg} />
+            </Pressable>
+          </View>
+          <View style={styles.middle}>{current ? <OrbControl color={fg} onInteraction={setOrbActive} /> : null}</View>
+          <View style={styles.side}>
+            {current ? (
+              <Pressable
+                onPress={() => void toggleShuffle()}
+                hitSlop={10}
+                style={({ pressed }) => [styles.iconButton, { opacity: pressed ? 0.5 : shuffle ? 1 : 0.4 }]}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: shuffle }}
+                accessibilityLabel="Aleatório"
+              >
+                <ShuffleLineIcon color={fg} />
+              </Pressable>
+            ) : null}
+          </View>
         </Animated.View>
       </SafeAreaView>
 
@@ -135,16 +163,13 @@ const styles = StyleSheet.create({
   top: { paddingHorizontal: 20, paddingTop: 8, minHeight: 64 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   center: { flex: 1 },
-  bottom: { paddingHorizontal: 24, paddingBottom: 8, gap: 10, alignItems: 'stretch' },
-  libraryButton: {
-    alignSelf: 'center',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: StyleSheet.hairlineWidth * 2,
+  bottom: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 12 },
+  side: { flex: 1, alignItems: 'center' },
+  middle: {
+    width: tuning.ui.orb.size + 64,
+    height: tuning.ui.orb.size,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginTop: 6,
   },
+  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,8 +1,13 @@
 /**
- * Shader dos pontos da galáxia. Tudo calculado na GPU:
- * - destaque da música tocando (comparando a posição com uCurrent)
- * - rastro (aPlayed = segundos desde uEpoch em que tocou; NO_TRAIL = sem rastro)
- * - pulsação com o som (uBeat) com queda por distância até uBeatRadius
+ * Shaders da galáxia. Tudo calculado na GPU.
+ *
+ * Nuvem (`points*`):
+ * - ponto da música tocando identificado pelo índice (aIndex == uCurrentIndex)
+ * - rastro (aPlayed = segundos desde uEpoch em que tocou; NO_TRAIL = sem rastro), com halo colorido
+ * - pulsação com o som (uBeat) com queda por distância até uBeatRadius, mais brilho e tamanho no pico
+ *
+ * Destaque (`highlight*`): um único vértice desenhado por cima da nuvem com núcleo, contorno,
+ * halo e anel guiado pelo som, com tamanho mínimo na tela.
  */
 export const pointsVertexShader = /* glsl */ `
 uniform float uTime;
@@ -10,69 +15,125 @@ uniform float uPointSize;
 uniform float uPixelRatio;
 uniform float uSizeRef;
 uniform vec3 uColor;
-uniform vec3 uHighlightColor;
 uniform vec3 uTrailColor;
 uniform float uTrailSeconds;
+uniform float uTrailGlowScale;
 uniform vec3 uCurrent;
+uniform float uCurrentIndex;
 uniform float uHasCurrent;
-uniform float uHighlightScale;
-uniform vec2 uHighlightPulse;
 uniform float uBeat;
 uniform float uBeatAmp;
 uniform float uBeatRadius;
+uniform float uBeatGlow;
+uniform float uBeatGrow;
 uniform float uPulseEnabled;
 uniform float uFade;
 
 attribute float aSeed;
 attribute float aPlayed;
+attribute float aIndex;
 
 varying vec3 vColor;
 varying float vAlpha;
-varying float vGlow;
+varying float vTrail;
 
 void main() {
   vec3 pos = position;
+  float isCurrent = uHasCurrent * (1.0 - step(0.5, abs(aIndex - uCurrentIndex)));
   vec3 toPoint = position - uCurrent;
   float d = length(toPoint);
-  float isCurrent = uHasCurrent * (1.0 - step(0.0005, d));
 
   // Pulsação: vizinhos balançam com a energia do som, mais forte perto da atual.
   float falloff = uHasCurrent * uPulseEnabled * (1.0 - isCurrent)
     * (1.0 - smoothstep(0.0, uBeatRadius, d));
   vec3 dir = d > 0.0001 ? toPoint / d : vec3(0.0);
-  pos += dir * uBeat * uBeatAmp * falloff * (0.6 + 0.8 * aSeed);
+  float kick = uBeat * falloff;
+  pos += dir * kick * uBeatAmp * (0.6 + 0.8 * aSeed);
 
   // Rastro: forte logo depois de tocar, volta à cor normal em uTrailSeconds.
   float trail = aPlayed > -1.0e8 ? clamp(1.0 - (uTime - aPlayed) / uTrailSeconds, 0.0, 1.0) : 0.0;
   trail = trail * trail;
+  // O ponto atual é desenhado pelo destaque; aqui ele some para não duplicar.
+  trail *= 1.0 - isCurrent;
 
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
-  float pulse = 1.0 + uHighlightPulse.x * sin(uTime * 6.2831853 * uHighlightPulse.y) * uPulseEnabled;
-  float size = uPointSize * (0.7 + 0.6 * aSeed) * (1.0 + 0.6 * trail);
-  size *= mix(1.0, uHighlightScale * pulse, isCurrent);
+  float size = uPointSize * (0.7 + 0.6 * aSeed) * (1.0 + 0.4 * trail) * (1.0 + uBeatGrow * kick);
+  // Espaço extra no sprite para o halo do rastro.
+  size *= mix(1.0, uTrailGlowScale, step(0.001, trail));
   gl_PointSize = max(1.0, size * uPixelRatio * (uSizeRef / max(-mv.z, 0.1)));
   gl_Position = projectionMatrix * mv;
 
-  vColor = mix(mix(uColor, uTrailColor, trail), uHighlightColor, isCurrent);
-  vAlpha = uFade * mix(0.55 + 0.45 * aSeed + 0.3 * trail, 1.0, isCurrent);
-  vGlow = isCurrent;
+  vColor = mix(uColor, uTrailColor, trail) * (1.0 + uBeatGlow * kick);
+  vAlpha = uFade * (1.0 - isCurrent) * min(1.0, 0.55 + 0.45 * aSeed + 0.4 * trail + uBeatGlow * kick);
+  vTrail = trail;
 }
 `;
 
 export const pointsFragmentShader = /* glsl */ `
-precision mediump float;
+uniform vec3 uTrailGlowColor;
+uniform float uTrailGlowScale;
 varying vec3 vColor;
 varying float vAlpha;
-varying float vGlow;
+varying float vTrail;
 
 void main() {
   vec2 c = gl_PointCoord - vec2(0.5);
   float r = length(c);
   if (r > 0.5) discard;
-  // Núcleo nítido com borda suave; a música atual ganha halo.
-  float core = 1.0 - smoothstep(0.18, 0.5, r);
-  float halo = vGlow * (1.0 - smoothstep(0.0, 0.5, r)) * 0.6;
-  float a = vAlpha * max(core, halo);
-  gl_FragColor = vec4(vColor * (1.0 + vGlow * 0.4), a);
+  // Com rastro, o sprite é maior: o núcleo ocupa só o centro e o resto é halo.
+  float coreR = vTrail > 0.001 ? 0.5 / uTrailGlowScale : 0.5;
+  float core = 1.0 - smoothstep(coreR * 0.36, coreR, r);
+  float glow = 1.0 - smoothstep(0.0, 0.5, r);
+  float halo = vTrail * glow * glow * 0.85;
+  float a = max(vAlpha * core, halo);
+  vec3 color = mix(uTrailGlowColor, vColor, core);
+  gl_FragColor = vec4(color, a);
+}
+`;
+
+export const highlightVertexShader = /* glsl */ `
+uniform float uPixelRatio;
+uniform float uSizeRef;
+uniform float uMinPx;
+uniform float uWorldSize;
+uniform float uBeat;
+uniform float uRingBeat;
+uniform float uTime;
+uniform float uBreath;
+
+varying float vBeat;
+
+void main() {
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  float worldPx = uWorldSize * uSizeRef / max(-mv.z, 0.1);
+  float px = max(uMinPx, worldPx) * (1.0 + uRingBeat * uBeat);
+  // Respiração lenta só com a música tocando (uBreath = 0 pausado).
+  px *= 1.0 + 0.06 * uBreath * sin(uTime * 3.0);
+  gl_PointSize = px * uPixelRatio;
+  gl_Position = projectionMatrix * mv;
+  vBeat = uBeat;
+}
+`;
+
+export const highlightFragmentShader = /* glsl */ `
+uniform vec3 uColor;
+uniform vec3 uOutline;
+uniform float uVisible;
+varying float vBeat;
+
+void main() {
+  vec2 c = gl_PointCoord - vec2(0.5);
+  float r = length(c);
+  if (r > 0.5) discard;
+  // Núcleo sólido com contorno escuro fino.
+  float core = 1.0 - smoothstep(0.12, 0.14, r);
+  float outline = (1.0 - smoothstep(0.14, 0.17, r)) * (1.0 - core);
+  // Halo suave em volta.
+  float halo = pow(1.0 - smoothstep(0.0, 0.5, r), 2.0) * 0.55;
+  // Anel fino perto da borda, mais forte no pico da energia.
+  float ring = (1.0 - smoothstep(0.012, 0.03, abs(r - 0.42))) * (0.35 + 0.65 * vBeat);
+  vec3 color = mix(uColor, uOutline, outline);
+  float a = max(max(core, outline), max(halo, ring));
+  gl_FragColor = vec4(color, a * uVisible);
 }
 `;

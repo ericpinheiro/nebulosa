@@ -19,6 +19,8 @@ export interface PointsDynamics {
   beat: number;
   /** 0..1: pulsação ligada (zoom afastado) ou desligada (zoom próximo). */
   pulseEnabled: number;
+  /** 1 com a música tocando, 0 pausada (o destaque para de "respirar"). */
+  playing: number;
 }
 
 interface Props {
@@ -37,11 +39,14 @@ export function GalaxyPoints({ data, played, epoch, dynamics }: Props) {
     const pos = new Float32Array(data.positions.length);
     for (let i = 0; i < pos.length; i++) pos[i] = data.positions[i] * g.worldRadius;
     const seed = new Float32Array(n);
+    const index = new Float32Array(n);
+    for (let i = 0; i < n; i++) index[i] = i;
     const rng = mulberry32(n);
     for (let i = 0; i < n; i++) seed[i] = rng();
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+    geo.setAttribute('aIndex', new THREE.BufferAttribute(index, 1));
     geo.setAttribute('aPlayed', new THREE.BufferAttribute(new Float32Array(n).fill(NO_TRAIL), 1));
     geo.computeBoundingSphere();
     return geo;
@@ -65,23 +70,25 @@ export function GalaxyPoints({ data, played, epoch, dynamics }: Props) {
       uPixelRatio: { value: PixelRatio.get() },
       uSizeRef: { value: 20 },
       uColor: { value: new THREE.Color(g.pointColor) },
-      uHighlightColor: { value: new THREE.Color(g.highlightColor) },
       uTrailColor: { value: new THREE.Color(g.trailColor) },
+      uTrailGlowColor: { value: new THREE.Color(g.trailGlowColor) },
+      uTrailGlowScale: { value: g.trailGlowScale },
       uTrailSeconds: { value: g.trailHours * 3600 },
       uCurrent: { value: new THREE.Vector3(9999, 9999, 9999) },
+      uCurrentIndex: { value: -1 },
       uHasCurrent: { value: 0 },
-      uHighlightScale: { value: g.highlightScale },
-      uHighlightPulse: { value: new THREE.Vector2(g.highlightPulseAmplitude, g.highlightPulseHz) },
       uBeat: { value: 0 },
       uBeatAmp: { value: g.beatAmplitude * g.worldRadius },
       uBeatRadius: { value: g.beatRadius },
+      uBeatGlow: { value: g.beatGlow },
+      uBeatGrow: { value: g.beatGrow },
       uPulseEnabled: { value: 1 },
       uFade: { value: 1 },
     }),
     [],
   );
 
-  useFrame(() => {
+  useFrame((state) => {
     const u = uniforms;
     const dyn = dynamics.current;
     u.uTime.value = (Date.now() - epoch) / 1000;
@@ -92,8 +99,14 @@ export function GalaxyPoints({ data, played, epoch, dynamics }: Props) {
         data.positions[idx * 3 + 1] * g.worldRadius,
         data.positions[idx * 3 + 2] * g.worldRadius,
       );
+      u.uCurrentIndex.value = idx;
       u.uHasCurrent.value = 1;
+      // Deslocamento proporcional à distância: perceptível com a câmera afastada.
+      const dist = state.camera.position.distanceTo(u.uCurrent.value);
+      const k = Math.max(0.6, Math.min(3, dist / g.beatReferenceDistance));
+      u.uBeatAmp.value = g.beatAmplitude * g.worldRadius * k;
     } else {
+      u.uCurrentIndex.value = -1;
       u.uHasCurrent.value = 0;
     }
     u.uBeat.value = dyn?.beat ?? 0;

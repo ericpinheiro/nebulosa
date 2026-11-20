@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import BottomSheet, { BottomSheetTextInput, BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { forwardRef, useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -118,44 +118,47 @@ export const LibrarySheet = forwardRef<BottomSheet, Props>(function LibrarySheet
       keyboardBehavior="extend"
       footerComponent={(p) => <MiniPlayerFooter {...p} extra={miniPlayerExtra} />}
     >
-      <BottomSheetView style={styles.header}>
-        {route.kind !== 'tab' ? (
-          <Pressable onPress={back} style={styles.back} hitSlop={8} accessibilityLabel="Voltar">
-            <Ionicons name="chevron-back" size={20} color={colors.panelText} />
-            <Text style={styles.backText}>Voltar</Text>
-          </Pressable>
-        ) : (
-          <>
-            <View style={styles.searchRow}>
-              <View style={styles.search}>
-                <Ionicons name="search" size={16} color={colors.panelMuted} />
-                <BottomSheetTextInput
-                  style={styles.searchInput}
-                  placeholder="Buscar música, álbum ou artista"
-                  placeholderTextColor={colors.panelMuted}
-                  value={query}
-                  onChangeText={setQuery}
-                  autoCorrect={false}
-                  returnKeyType="search"
-                  clearButtonMode="while-editing"
-                />
+      {/* View comum: o BottomSheetView do gorhom 5.x é position:absolute e deixava a lista por cima. */}
+      <View style={styles.content}>
+        <View style={styles.header}>
+          {route.kind !== 'tab' ? (
+            <Pressable onPress={back} style={styles.back} hitSlop={8} accessibilityLabel="Voltar">
+              <Ionicons name="chevron-back" size={20} color={colors.panelText} />
+              <Text style={styles.backText}>Voltar</Text>
+            </Pressable>
+          ) : (
+            <>
+              <View style={styles.searchRow}>
+                <View style={styles.search}>
+                  <Ionicons name="search" size={16} color={colors.panelMuted} />
+                  <BottomSheetTextInput
+                    style={styles.searchInput}
+                    placeholder="Buscar música, álbum ou artista"
+                    placeholderTextColor={colors.panelMuted}
+                    value={query}
+                    onChangeText={setQuery}
+                    autoCorrect={false}
+                    returnKeyType="search"
+                    clearButtonMode="while-editing"
+                  />
+                </View>
+                <AccountButton />
               </View>
-              <AccountButton />
-            </View>
-            {!searching ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-                {TABS.map((t) => (
-                  <Pressable key={t} onPress={() => selectTab(t)} style={styles.tab}>
-                    <Text style={[styles.tabText, t === tab && styles.tabOn]}>{TAB_LABELS[t]}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            ) : null}
-          </>
-        )}
-        <SyncBanner />
-      </BottomSheetView>
-      <View style={styles.body}>{body}</View>
+              {!searching ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+                  {TABS.map((t) => (
+                    <Pressable key={t} onPress={() => selectTab(t)} style={styles.tab}>
+                      <Text style={[styles.tabText, t === tab && styles.tabOn]}>{TAB_LABELS[t]}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              ) : null}
+            </>
+          )}
+          <SyncBanner />
+        </View>
+        <View style={styles.body}>{body}</View>
+      </View>
     </BottomSheet>
   );
 });
@@ -189,5 +192,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
-  body: { flex: 1 },
+  content: { flex: 1 },
+  body: { flex: 1, overflow: 'hidden' },
 });

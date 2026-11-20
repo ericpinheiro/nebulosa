@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
-  BounceIn,
+  Easing,
   FadeOut,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withSequence,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import * as THREE from 'three';
@@ -17,6 +18,7 @@ import { getCoverLookup, type CoverInfo } from '@/state/library/repository';
 import { useLibraryStore } from '@/state/library/sync';
 import { Cover } from '@/ui/components/Cover';
 
+import { pickCover, type CoverHitCandidate } from './cover-hit';
 import { isCloseZoom, type Orbit } from './orbit';
 
 const g = tuning.galaxy;
@@ -33,37 +35,73 @@ function useCoverLookup() {
   return useQuery({ queryKey: ['coverLookup', v], queryFn: getCoverLookup, staleTime: Infinity }).data;
 }
 
+/** Entrada: fade in crescendo até passar levemente do tamanho, uma vez, e voltar. Sem mola. */
+function coverEntering() {
+  'worklet';
+  return {
+    initialValues: { opacity: 0, transform: [{ scale: 0.6 }] },
+    animations: {
+      opacity: withTiming(1, { duration: g.coverEnterMs }),
+      transform: [
+        {
+          scale: withSequence(
+            withTiming(g.coverEnterOvershoot, { duration: g.coverEnterMs, easing: Easing.out(Easing.cubic) }),
+            withTiming(1, { duration: g.coverSettleMs, easing: Easing.inOut(Easing.quad) }),
+          ),
+        },
+      ],
+    },
+  };
+}
+
 function CoverSprite({
   slot,
   frame,
   info,
   selected,
-  onPress,
+  dimmed,
 }: {
   slot: number;
   frame: SharedValue<number[]>;
   info: CoverInfo;
   selected: boolean;
-  onPress: () => void;
+  dimmed: boolean;
 }) {
   const style = useAnimatedStyle(() => {
     const o = slot * STRIDE;
     const f = frame.value;
     return {
       opacity: f[o + 3],
-      zIndex: f[o + 4],
+      // A selecionada fica acima de todas.
+      zIndex: f[o + 4] + (selected ? 100_000 : 0),
       transform: [{ translateX: f[o] - BASE / 2 }, { translateY: f[o + 1] - BASE / 2 }, { scale: f[o + 2] }],
     };
   });
   const selectStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: withSpring(selected ? g.coverSelectedScale : 1, { damping: 12, stiffness: 220 }) }],
+    transform: [
+      {
+        scale: withTiming(selected ? g.coverSelectedScale : 1, {
+          duration: g.coverSelectMs,
+          easing: Easing.out(Easing.cubic),
+        }),
+      },
+    ],
+  }));
+  const grayStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(dimmed ? 1 : 0, { duration: g.coverSelectMs }),
+  }));
+  const veilStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(dimmed ? g.coverDimOpacity : 0, { duration: g.coverSelectMs }),
   }));
   return (
-    <Animated.View style={[styles.sprite, style]}>
-      <Animated.View entering={BounceIn.duration(500)} exiting={FadeOut.duration(150)} style={selectStyle}>
-        <Pressable onPress={onPress} hitSlop={6} accessibilityRole="button" accessibilityLabel={info.title}>
+    <Animated.View style={[styles.sprite, style]} accessibilityLabel={info.title}>
+      <Animated.View style={selectStyle}>
+        <Animated.View entering={coverEntering} exiting={FadeOut.duration(150)} style={styles.isolate}>
           <Cover itemId={info.imageItemId} tag={info.imageTag} size={BASE} radius={6} requestWidth={g.coverThumbSize} />
-        </Pressable>
+          {/* Cinza com blend "saturation" tira a cor da capa abaixo (preto e branco). */}
+          <Animated.View style={[styles.overlay, styles.gray, grayStyle]} />
+          <Animated.View style={[styles.overlay, styles.veil, veilStyle]} />
+        </Animated.View>
       </Animated.View>
     </Animated.View>
   );
@@ -72,18 +110,24 @@ function CoverSprite({
 /**
  * Capas no zoom próximo: escolhe até `maxCovers` pontos visíveis mais próximos da câmera
  * (índice espacial + projeção) e posiciona miniaturas sobre eles a cada quadro.
- * 1º toque aumenta a capa; 2º toque chama `onPlay`.
+ * As capas não recebem toque (os gestos da galáxia funcionam por cima delas): a galáxia
+ * repassa o toque para `handleTap`, que acha a capa pela posição. 1º toque aumenta; 2º chama `onPlay`.
  */
 export function useGalaxyCovers(onPlay: (id: string) => void): {
   onFrame: FrameHandler;
   element: React.ReactNode;
-  clearSelection: () => void;
+  /** Toque na galáxia em (x, y): seleciona/toca a capa ali ou desfaz a seleção. */
+  handleTap: (x: number, y: number) => void;
 } {
   const lookup = useCoverLookup();
   const frame = useSharedValue<number[]>(new Array(MAX * STRIDE).fill(0));
   const [slots, setSlots] = useState<(number | null)[]>(() => new Array(MAX).fill(null));
   const [selected, setSelected] = useState<number | null>(null);
   const slotsRef = useRef(slots);
+  const selectedRef = useRef<number | null>(null);
+  selectedRef.current = selected;
+  /** Última posição publicada de cada slot (cópia em JS para o teste de toque). */
+  const lastFrame = useRef<number[]>(new Array(MAX * STRIDE).fill(0));
   const lastSelect = useRef(0);
   const v = useMemo(() => new THREE.Vector3(), []);
   const camSpace = useMemo(() => new THREE.Vector3(), []);
@@ -160,14 +204,49 @@ export function useGalaxyCovers(onPlay: (id: string) => void): {
         out[o + 3] = 1;
         out[o + 4] = Math.round(10000 - p.depth * 100);
       });
+      lastFrame.current = out;
       frame.value = out;
     },
     [lookup, frame, v, camSpace],
   );
 
   const data = useGalaxyStore((s) => s.data);
+
+  const handleTap = useCallback(
+    (x: number, y: number) => {
+      const f = lastFrame.current;
+      const sel = selectedRef.current;
+      const candidates: CoverHitCandidate[] = [];
+      slotsRef.current.forEach((i, k) => {
+        const o = k * STRIDE;
+        if (i == null || f[o + 3] !== 1) return;
+        const scale = i === sel ? g.coverSelectedScale : 1;
+        candidates.push({
+          index: i,
+          x: f[o],
+          y: f[o + 1],
+          size: f[o + 2] * BASE * scale,
+          z: f[o + 4] + (i === sel ? 1e6 : 0),
+        });
+      });
+      const hit = pickCover(candidates, x, y, g.coverHitRadiusPx);
+      const id = hit != null ? useGalaxyStore.getState().data?.ids[hit] : null;
+      if (hit == null || !id) {
+        setSelected(null);
+        return;
+      }
+      if (sel === hit) {
+        setSelected(null);
+        onPlay(id);
+      } else {
+        setSelected(hit);
+      }
+    },
+    [onPlay],
+  );
+
   const element = (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {slots.map((i, k) => {
         const id = i != null ? data?.ids[i] : null;
         const info = id ? lookup?.get(id) : undefined;
@@ -179,23 +258,20 @@ export function useGalaxyCovers(onPlay: (id: string) => void): {
             frame={frame}
             info={info}
             selected={selected === i}
-            onPress={() => {
-              if (selected === i) {
-                setSelected(null);
-                onPlay(id);
-              } else {
-                setSelected(i);
-              }
-            }}
+            dimmed={selected != null && selected !== i}
           />
         );
       })}
     </View>
   );
 
-  return { onFrame, element, clearSelection: () => setSelected(null) };
+  return { onFrame, element, handleTap };
 }
 
 const styles = StyleSheet.create({
   sprite: { position: 'absolute', left: 0, top: 0, width: BASE, height: BASE },
+  isolate: { isolation: 'isolate', borderRadius: 6, overflow: 'hidden' },
+  overlay: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderRadius: 6 },
+  gray: { backgroundColor: '#808080', mixBlendMode: 'saturation' },
+  veil: { backgroundColor: '#ffffff' },
 });

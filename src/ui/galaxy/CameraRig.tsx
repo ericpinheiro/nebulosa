@@ -25,6 +25,13 @@ export function CameraRig({
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.1);
+    // Centro óptico no meio da área livre (entre cabeçalho e controles), não no meio da tela.
+    const shift = orbit.viewShiftPx;
+    const v = camera.view;
+    if (size.width > 0 && (!v || v.offsetY !== -shift || v.fullWidth !== size.width || v.fullHeight !== size.height)) {
+      camera.setViewOffset(size.width, size.height, 0, -shift, size.width, size.height);
+      camera.updateProjectionMatrix();
+    }
     activeRef.current = step(orbit, dt);
     const [x, y, z] = cameraPosition(orbit);
     camera.position.set(x, y, z);

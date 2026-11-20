@@ -6,6 +6,7 @@ import { getDb } from '@/state/library/db';
 import { useLibraryStore } from '@/state/library/sync';
 import { kv } from '@/services/storage/kv';
 
+import { boundingSphere, type BoundingSphere } from './bounds';
 import { parseGalaxy, type GalaxyData } from './contract';
 import { generateMockGalaxy, mulberry32 } from './generator';
 import { SpatialIndex } from './spatial-index';
@@ -13,6 +14,8 @@ import { SpatialIndex } from './spatial-index';
 interface GalaxyState {
   data: GalaxyData | null;
   index: SpatialIndex | null;
+  /** Esfera envolvente (coordenadas normalizadas), para enquadrar a galáxia inteira. */
+  bounds: BoundingSphere | null;
   source: 'none' | 'placeholder' | 'mock' | 'remote';
   load: () => Promise<void>;
 }
@@ -25,7 +28,7 @@ function cacheFile() {
 }
 
 function withIndex(data: GalaxyData) {
-  return { data, index: new SpatialIndex(data.positions) };
+  return { data, index: new SpatialIndex(data.positions), bounds: boundingSphere(data.positions) };
 }
 
 /** Pontos decorativos enquanto a biblioteca não chegou (a galáxia aparece girando mesmo vazia). */
@@ -71,6 +74,7 @@ async function loadMock(): Promise<GalaxyData | null> {
 export const useGalaxyStore = create<GalaxyState>((set, get) => ({
   data: null,
   index: null,
+  bounds: null,
   source: 'none',
   load: async () => {
     if (!get().data) set({ ...withIndex(placeholder()), source: 'placeholder' });

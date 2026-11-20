@@ -11,7 +11,7 @@ import { NowPlayingScreen } from '@/ui/now-playing/NowPlayingScreen';
 export default function MainScreen() {
   const played = useTrail(SESSION_EPOCH);
   const getBeat = useBeat();
-  // 2º toque numa capa: toca a música com as vizinhas na fila (rádio).
+  // Toque na galáxia acha a capa pela posição; 2º toque numa capa: toca a música com as vizinhas na fila (rádio).
   const covers = useGalaxyCovers((id) => void startRadio(id));
   const currentId = usePlayerStore((s) => s.current?.id);
 
@@ -22,7 +22,7 @@ export default function MainScreen() {
         epoch: SESSION_EPOCH,
         getBeat,
         onFrame: covers.onFrame,
-        onTap: covers.clearSelection,
+        onTap: covers.handleTap,
         children: covers.element,
       }}
       headerAccessory={(fg) => (currentId ? <FavoriteButton id={currentId} color={fg} /> : null)}
