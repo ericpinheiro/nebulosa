@@ -1,0 +1,25 @@
+schema: spec-driven
+
+context: |
+  Projeto: Nebulosa — app de música (iOS primeiro, Android depois) que toca a
+  biblioteca de música do Jellyfin fixo em https://brunoflix.rizomalivre.com.
+  A tela principal é uma galáxia 3D onde cada ponto é uma música (posições UMAP).
+  Briefing completo: estudo/briefing.md (referências visuais em estudo/).
+  Idioma do app e das specs: português. Código e identificadores em inglês.
+  Usuários: Eric (iPhone 16 Pro) e Bruno (Android).
+  Stack: TypeScript, React Native + Expo (development build, sem Expo Go),
+  Expo Router, Reanimated + Gesture Handler, three.js via @react-three/fiber +
+  expo-gl, react-native-track-player (atrás de uma interface própria),
+  @gorhom/bottom-sheet, FlashList, expo-image, @jellyfin/sdk + TanStack Query,
+  Zustand, expo-sqlite, MMKV, expo-secure-store, react-native-image-colors.
+  Arquitetura em 3 camadas: telas (só leem estado local) -> estado (Zustand,
+  SQLite, Query) -> serviços (únicos que falam com Jellyfin/galáxia/Last.fm).
+  Parâmetros ajustáveis da galáxia e da interface ficam em src/config/tuning.ts.
+  Testes: Jest (jest-expo) para lógica pura; validação com `npm run typecheck`.
+  Commits no padrão conventional commits.
+
+rules:
+  proposal:
+    - Referenciar as capacidades do briefing (auth, library-sync, playback, now-playing, galaxy, galaxy-data, radio, library-ui, favorites-scrobble)
+  tasks:
+    - Tarefas pequenas e verificáveis; marcar quais dependem de build nativo (Xcode)
