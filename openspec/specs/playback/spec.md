@@ -2,7 +2,6 @@
 
 ## Purpose
 Reprodução de áudio isolada atrás de uma interface própria, com fila, shuffle, segundo plano, controles remotos e relatório ao Jellyfin.
-
 ## Requirements
 ### Requirement: Controles básicos
 O player SHALL oferecer play/pause, anterior, próxima, shuffle e seek pela barra de progresso. Não há modo de repetição.
@@ -75,4 +74,11 @@ Ao sair da conta, o player SHALL parar, reportar a parada e esvaziar a fila.
 #### Scenario: Logout durante a reprodução
 - **WHEN** o usuário sai da conta com música tocando
 - **THEN** a música para e a fila fica vazia
+
+### Requirement: Validação no aparelho
+A reprodução SHALL ser validada num iPhone real com build de desenvolvimento, cobrindo segundo plano, tela de bloqueio e emenda entre faixas FLAC de um álbum.
+
+#### Scenario: Álbum em segundo plano
+- **WHEN** um álbum toca com o iPhone bloqueado
+- **THEN** as faixas emendam sem silêncio perceptível e os controles da tela de bloqueio funcionam
 
