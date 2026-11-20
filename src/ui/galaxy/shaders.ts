@@ -94,8 +94,9 @@ void main() {
 export const highlightVertexShader = /* glsl */ `
 uniform float uPixelRatio;
 uniform float uSizeRef;
-uniform float uMinPx;
-uniform float uWorldSize;
+uniform float uPointSize;
+uniform float uPointScale;
+uniform float uMinCorePx;
 uniform float uBeat;
 uniform float uRingBeat;
 uniform float uTime;
@@ -105,8 +106,11 @@ varying float vBeat;
 
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  float worldPx = uWorldSize * uSizeRef / max(-mv.z, 0.1);
-  float px = max(uMinPx, worldPx) * (1.0 + uRingBeat * uBeat);
+  // Núcleo = uPointScale x um ponto normal (mesma regra de tamanho da nuvem); o sprite inteiro
+  // (núcleo + halo + anel) é o núcleo dividido pela fração que ele ocupa (CORE_R * 2).
+  float pointPx = uPointSize * uSizeRef / max(-mv.z, 0.1);
+  float corePx = max(uMinCorePx, uPointScale * pointPx);
+  float px = corePx / 0.56 * (1.0 + uRingBeat * uBeat);
   // Respiração lenta só com a música tocando (uBreath = 0 pausado).
   px *= 1.0 + 0.06 * uBreath * sin(uTime * 3.0);
   gl_PointSize = px * uPixelRatio;
@@ -125,13 +129,13 @@ void main() {
   vec2 c = gl_PointCoord - vec2(0.5);
   float r = length(c);
   if (r > 0.5) discard;
-  // Núcleo sólido com contorno escuro fino.
-  float core = 1.0 - smoothstep(0.12, 0.14, r);
-  float outline = (1.0 - smoothstep(0.14, 0.17, r)) * (1.0 - core);
-  // Halo suave em volta.
-  float halo = pow(1.0 - smoothstep(0.0, 0.5, r), 2.0) * 0.55;
+  // Núcleo sólido (raio 0.28 do sprite) com contorno claro fino.
+  float core = 1.0 - smoothstep(0.26, 0.28, r);
+  float outline = (1.0 - smoothstep(0.28, 0.32, r)) * (1.0 - core);
+  // Halo curto na cor do destaque em volta.
+  float halo = pow(1.0 - smoothstep(0.28, 0.5, r), 1.5) * 0.6 * (1.0 - core);
   // Anel fino perto da borda, mais forte no pico da energia.
-  float ring = (1.0 - smoothstep(0.012, 0.03, abs(r - 0.42))) * (0.35 + 0.65 * vBeat);
+  float ring = (1.0 - smoothstep(0.015, 0.035, abs(r - 0.44))) * (0.25 + 0.75 * vBeat);
   vec3 color = mix(uColor, uOutline, outline);
   float a = max(max(core, outline), max(halo, ring));
   gl_FragColor = vec4(color, a * uVisible);

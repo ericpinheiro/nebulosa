@@ -25,6 +25,14 @@ export function mixWithWhite(hex: string, amount: number): string {
   return `#${rgb.map((c) => toHex(c + (255 - c) * a)).join('')}`;
 }
 
+/** Mistura a cor com preto: 0 = cor pura, 1 = preto. */
+export function mixWithBlack(hex: string, amount: number): string {
+  const rgb = parseHex(hex);
+  if (!rgb) return '#000000';
+  const a = Math.max(0, Math.min(1, amount));
+  return `#${rgb.map((c) => toHex(c * (1 - a))).join('')}`;
+}
+
 /** Escurece (amount > 0) ou clareia (amount < 0) levemente. */
 export function shade(hex: string, amount: number): string {
   const rgb = parseHex(hex);
@@ -49,11 +57,11 @@ export function luminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** Degradê do fundo: topo um pouco mais escuro, base mais clara. */
-export function backgroundGradient(coverColor: string | null, whiteMix: number): [string, string] {
-  if (!coverColor) return ['#a9a9ad', '#dcdcdf'];
-  const base = mixWithWhite(coverColor, whiteMix);
-  return [shade(base, 0.18), mixWithWhite(base, 0.35)];
+/** Degradê escuro do fundo: cor da capa misturada com preto; topo mais escuro, base um pouco mais clara. */
+export function backgroundGradient(coverColor: string | null, darkMix: number): [string, string] {
+  if (!coverColor) return ['#141418', '#26262c'];
+  const base = mixWithBlack(coverColor, darkMix);
+  return [shade(base, 0.35), mixWithWhite(base, 0.06)];
 }
 
 export function formatDuration(ms: number): string {

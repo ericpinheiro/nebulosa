@@ -6,20 +6,20 @@ export const tuning = {
   galaxy: {
     /** Cor base dos pontos. Preparado para cor por agrupamento no futuro (campo `group`). */
     pointColor: '#ffffff',
-    /** Cor de destaque da música tocando: saturada para contrastar com o fundo claro. */
+    /** Cor de destaque da música tocando (exclusiva dela): laranja saturado sobre o fundo escuro. */
     highlightColor: '#ff6a00',
-    /** Contorno fino do núcleo do destaque (contraste extra sobre capas claras). */
-    highlightOutlineColor: '#5a2400',
-    /** Diâmetro mínimo do destaque (núcleo + halo) na tela, em pt, para não sumir no zoom afastado. */
-    highlightMinPx: 38,
-    /** Tamanho do destaque no mundo (usado quando a câmera está perto e ele fica maior que o mínimo). */
-    highlightWorldSize: 1.4,
+    /** Contorno fino do núcleo do destaque (claro, para separar do fundo escuro e dos pontos). */
+    highlightOutlineColor: '#ffffff',
+    /** Diâmetro do núcleo do destaque em relação a um ponto normal (acompanha o zoom como os outros pontos). */
+    highlightPointScale: 5,
+    /** Diâmetro mínimo do núcleo na tela, em pt, para não sumir no zoom bem afastado. */
+    highlightMinCorePx: 6,
     /** Quanto o anel do destaque se expande no pico da energia (fração do raio). */
-    highlightRingBeat: 0.35,
-    /** Cor do rastro das músicas tocadas recentemente. */
-    trailColor: '#ffa31a',
+    highlightRingBeat: 0.25,
+    /** Cor do rastro das músicas tocadas recentemente (azul, para não confundir com a música atual). */
+    trailColor: '#4da3ff',
     /** Cor do halo ("sombra") em volta dos pontos do rastro. */
-    trailGlowColor: '#d96a00',
+    trailGlowColor: '#1f6fd6',
     /** Tamanho do ponto do rastro com o halo, em relação ao ponto normal. */
     trailGlowScale: 3.2,
     /** Duração do rastro, em horas. Depois disso o ponto volta à cor normal. */
@@ -59,6 +59,8 @@ export const tuning = {
     coverSelectMs: 200,
     /** Véu claro sobre as capas fora de foco (além do preto e branco), 0..1. */
     coverDimOpacity: 0.3,
+    /** Cor do véu sobre as capas não selecionadas (escura, combinando com o fundo). */
+    coverDimColor: '#0b0b0f',
     /** Raio de toque em pixels para encontrar uma capa no zoom próximo. */
     coverHitRadiusPx: 34,
     /** Pulsação dos vizinhos com o som (deslocamento relativo ao raio, na distância de referência). */
@@ -81,8 +83,8 @@ export const tuning = {
   ui: {
     /** Tempo sem toque até esconder a interface, em ms. */
     hideUiAfterMs: 10_000,
-    /** Mistura da cor da capa com branco no fundo (0 = cor pura, 1 = branco). */
-    backgroundWhiteMix: 0.62,
+    /** Mistura da cor da capa com preto no fundo (0 = cor pura, 1 = preto). */
+    backgroundDarkMix: 0.7,
     /** Opacidade do degradê de fundo. */
     backgroundOpacity: 0.85,
     /** Duração da transição de cor do fundo, em ms. */
@@ -114,6 +116,8 @@ export const tuning = {
   playback: {
     /** Intervalo de relatório de progresso ao Jellyfin, em ms. */
     progressReportMs: 10_000,
+    /** Tempo ouvido para a faixa contar como tocada: entra no rastro e é reportada ao Jellyfin, em segundos. */
+    trailMinListenS: 20,
     /** Até quantos segundos "anterior" volta para a faixa anterior em vez de reiniciar. */
     previousRestartThresholdS: 3,
   },

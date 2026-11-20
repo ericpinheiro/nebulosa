@@ -27,8 +27,9 @@ export function CurrentHighlight({ data, dynamics }: { data: GalaxyData; dynamic
     () => ({
       uPixelRatio: { value: PixelRatio.get() },
       uSizeRef: { value: 20 },
-      uMinPx: { value: g.highlightMinPx },
-      uWorldSize: { value: g.highlightWorldSize },
+      uPointSize: { value: g.pointSize },
+      uPointScale: { value: g.highlightPointScale },
+      uMinCorePx: { value: g.highlightMinCorePx },
       uBeat: { value: 0 },
       uRingBeat: { value: g.highlightRingBeat },
       uTime: { value: 0 },
@@ -39,6 +40,22 @@ export function CurrentHighlight({ data, dynamics }: { data: GalaxyData; dynamic
     }),
     [],
   );
+
+  // Material criado aqui: com <shaderMaterial uniforms> o r3f copia os uniforms e `uVisible`,
+  // `uBeat` etc. ficariam presos no valor inicial (o destaque nunca aparecia).
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: highlightVertexShader,
+        fragmentShader: highlightFragmentShader,
+        uniforms,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+      }),
+    [uniforms],
+  );
+  useEffect(() => () => material.dispose(), [material]);
 
   useFrame(() => {
     const dyn = dynamics.current;
@@ -65,15 +82,6 @@ export function CurrentHighlight({ data, dynamics }: { data: GalaxyData; dynamic
   });
 
   return (
-    <points geometry={geometry} frustumCulled={false} renderOrder={10}>
-      <shaderMaterial
-        vertexShader={highlightVertexShader}
-        fragmentShader={highlightFragmentShader}
-        uniforms={uniforms}
-        transparent
-        depthWrite={false}
-        depthTest={false}
-      />
-    </points>
+    <points geometry={geometry} material={material} frustumCulled={false} renderOrder={10} />
   );
 }

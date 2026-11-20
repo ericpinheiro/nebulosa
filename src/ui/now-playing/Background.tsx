@@ -7,17 +7,17 @@ import { tuning } from '@/config/tuning';
 import { backgroundGradient } from '@/ui/color';
 
 /**
- * Degradê claro com a cor da capa. Duas camadas: a nova aparece por cima
+ * Degradê escuro com a cor da capa. Duas camadas: a nova aparece por cima
  * da anterior com fade, e depois vira a base.
  */
 export function Background({ color }: { color: string | null }) {
-  const [base, setBase] = useState<[string, string]>(() => backgroundGradient(null, tuning.ui.backgroundWhiteMix));
+  const [base, setBase] = useState<[string, string]>(() => backgroundGradient(null, tuning.ui.backgroundDarkMix));
   const [top, setTop] = useState<[string, string]>(base);
   const opacity = useSharedValue(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const next = backgroundGradient(color, tuning.ui.backgroundWhiteMix);
+    const next = backgroundGradient(color, tuning.ui.backgroundDarkMix);
     setTop(next);
     opacity.value = 0;
     opacity.value = withTiming(1, { duration: tuning.ui.backgroundTransitionMs });

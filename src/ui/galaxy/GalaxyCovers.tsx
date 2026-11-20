@@ -273,5 +273,5 @@ const styles = StyleSheet.create({
   isolate: { isolation: 'isolate', borderRadius: 6, overflow: 'hidden' },
   overlay: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderRadius: 6 },
   gray: { backgroundColor: '#808080', mixBlendMode: 'saturation' },
-  veil: { backgroundColor: '#ffffff' },
+  veil: { backgroundColor: g.coverDimColor },
 });

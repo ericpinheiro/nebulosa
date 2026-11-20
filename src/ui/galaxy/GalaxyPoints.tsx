@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber/native';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { PixelRatio } from 'react-native';
 import * as THREE from 'three';
 
@@ -32,7 +32,6 @@ interface Props {
 }
 
 export function GalaxyPoints({ data, played, epoch, dynamics }: Props) {
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
 
   const geometry = useMemo(() => {
     const n = data.positions.length / 3;
@@ -88,6 +87,21 @@ export function GalaxyPoints({ data, played, epoch, dynamics }: Props) {
     [],
   );
 
+  // Material criado aqui (e não via <shaderMaterial uniforms>): o r3f copia cada uniform para um
+  // objeto novo, e aí os valores numéricos atualizados a cada quadro nunca chegavam à GPU.
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: pointsVertexShader,
+        fragmentShader: pointsFragmentShader,
+        uniforms,
+        transparent: true,
+        depthWrite: false,
+      }),
+    [uniforms],
+  );
+  useEffect(() => () => material.dispose(), [material]);
+
   useFrame((state) => {
     const u = uniforms;
     const dyn = dynamics.current;
@@ -115,15 +129,6 @@ export function GalaxyPoints({ data, played, epoch, dynamics }: Props) {
   });
 
   return (
-    <points geometry={geometry} frustumCulled={false}>
-      <shaderMaterial
-        ref={materialRef}
-        vertexShader={pointsVertexShader}
-        fragmentShader={pointsFragmentShader}
-        uniforms={uniforms}
-        transparent
-        depthWrite={false}
-      />
-    </points>
+    <points geometry={geometry} material={material} frustumCulled={false} />
   );
 }

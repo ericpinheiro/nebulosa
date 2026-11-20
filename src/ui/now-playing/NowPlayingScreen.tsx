@@ -52,7 +52,7 @@ export function NowPlayingScreen({
   const coverColor = useCoverColor(current?.imageItemId, current?.imageTag);
   const { visible, poke } = useAutoHide(sheetOpen || expanded || interacting || orbActive);
 
-  const [top] = backgroundGradient(coverColor, tuning.ui.backgroundWhiteMix);
+  const [top] = backgroundGradient(coverColor, tuning.ui.backgroundDarkMix);
   const fg = luminance(top) > 0.62 ? '#1d1d22' : '#ffffff';
 
   const uiOpacity = useSharedValue(1);
