@@ -18,5 +18,5 @@
 ## 4. Validação
 
 - [x] 4.1 `npm run typecheck && npm test && npm run lint` e `CI=1 npx expo export --platform ios`
-- [ ] 4.2 (build nativo) Pinça e rotação começando em cima das capas com a tela cheia delas
-- [ ] 4.3 (build nativo) Entrada das capas suave; seleção sem bounce; outras em preto e branco; 2º toque toca a música
+- [x] 4.2 (build nativo) Pinça e rotação começando em cima das capas com a tela cheia delas
+- [x] 4.3 (build nativo) Entrada das capas suave; seleção sem bounce; outras em preto e branco; 2º toque toca a música

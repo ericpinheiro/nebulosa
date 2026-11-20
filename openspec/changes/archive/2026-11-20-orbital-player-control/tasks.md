@@ -25,8 +25,8 @@
 ## 5. Validação
 
 - [x] 5.1 `npm run typecheck && npm test && npm run lint` e `CI=1 npx expo export --platform ios`
-- [ ] 5.2 (build nativo) Tocar/pausar, arrastar para os dois lados (curto e longo), seek circular cruzando o topo, VoiceOver
-- [ ] 5.3 (build nativo) Ajustar `tuning.ui.orb` no aparelho
+- [x] 5.2 (build nativo) Tocar/pausar, arrastar para os dois lados (curto e longo), seek circular cruzando o topo, VoiceOver
+- [x] 5.3 (build nativo) Ajustar `tuning.ui.orb` no aparelho
 
 ## 6. Ajustes após o teste no aparelho
 

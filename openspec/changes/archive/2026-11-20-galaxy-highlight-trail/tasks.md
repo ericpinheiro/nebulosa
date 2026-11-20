@@ -23,6 +23,6 @@
 ## 5. Validação
 
 - [x] 5.1 `npm run typecheck && npm test && npm run lint` e `CI=1 npx expo export --platform ios`
-- [ ] 5.2 (build nativo) Música tocando visível no zoom máximo e intermediário, com capas claras e escuras
-- [ ] 5.3 (build nativo) Vizinhos vibrando tocando e parados pausado; rastro fácil de ver
-- [ ] 5.4 (build nativo) Ajustar cores e intensidades em `tuning.ts`; conferir fps
+- [x] 5.2 (build nativo) Música tocando visível no zoom máximo e intermediário, com capas claras e escuras
+- [x] 5.3 (build nativo) Vizinhos vibrando tocando e parados pausado; rastro fácil de ver
+- [x] 5.4 (build nativo) Ajustar cores e intensidades em `tuning.ts`; conferir fps

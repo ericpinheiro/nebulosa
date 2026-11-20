@@ -7,6 +7,6 @@
 ## 2. Validação
 
 - [x] 2.1 `npm run typecheck && npm test && npm run lint` e `CI=1 npx expo export --platform ios`
-- [ ] 2.2 (build nativo) Abrir a biblioteca: busca e abas visíveis e tocáveis, nas duas alturas do painel
-- [ ] 2.3 (build nativo) Abrir um álbum e tocar "Voltar"; abrir artista → álbum → "Voltar" duas vezes
-- [ ] 2.4 (build nativo) Rolar a grade e a lista do álbum; arrastar o painel pelo cabeçalho continua funcionando
+- [x] 2.2 (build nativo) Abrir a biblioteca: busca e abas visíveis e tocáveis, nas duas alturas do painel
+- [x] 2.3 (build nativo) Abrir um álbum e tocar "Voltar"; abrir artista → álbum → "Voltar" duas vezes
+- [x] 2.4 (build nativo) Rolar a grade e a lista do álbum; arrastar o painel pelo cabeçalho continua funcionando

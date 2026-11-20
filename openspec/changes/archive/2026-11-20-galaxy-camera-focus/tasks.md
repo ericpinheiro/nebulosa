@@ -20,5 +20,5 @@
 ## 4. Validação
 
 - [x] 4.1 `npm run typecheck && npm test && npm run lint` e `CI=1 npx expo export --platform ios`
-- [ ] 4.2 (build nativo) Abrir o app: galáxia inteira e centralizada; afastar ao máximo girando sem cortes
-- [ ] 4.3 (build nativo) Tocar música pela capa, pela biblioteca e por troca automática; conferir que espera o gesto terminar
+- [x] 4.2 (build nativo) Abrir o app: galáxia inteira e centralizada; afastar ao máximo girando sem cortes
+- [x] 4.3 (build nativo) Tocar música pela capa, pela biblioteca e por troca automática; conferir que espera o gesto terminar
